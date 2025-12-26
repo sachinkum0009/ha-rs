@@ -2,6 +2,11 @@
 name = "ha-rs"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+authors = ["Sachin Kumar <sachinkumar.ar97@gmail.com>"]
+description = "A command-line interface (CLI) tool for interacting with Home Assistant."
+repository = "https://github.com/sachinkum0009/ha-rs.git"
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
