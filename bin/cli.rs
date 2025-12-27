@@ -3,11 +3,20 @@
  */
 
 use std::env;
+use std::io;
+
 use ha_rs::client::HaClient;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum, CommandFactory};
+use clap_complete::{generate, shells::{Bash, Zsh}};
 
 #[derive(Parser)]
-#[command(name = "ha_control", author, version, about = "Control Home Assistant", long_about = None)]
+#[command(
+    name = "ha_control",
+    author,
+    version,
+    about = "Control Home Assistant",
+    long_about = None
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -15,15 +24,40 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Show wheter the device is On or Off
+    /// Show whether the device is On or Off
     Status,
     /// Toggle the device (turn on if off, turn off if on)
     Toggle,
+    /// Generate shell completion scripts
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+}
+
+#[derive(Copy, Clone, ValueEnum)]
+enum Shell {
+    Bash,
+    Zsh,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+
+    // Handle completions first (no HA connection needed)
+    if let Commands::Completions { shell } = cli.command {
+        let mut cmd = Cli::command();
+        let bin_name = cmd.get_name().to_string();
+
+        match shell {
+            Shell::Bash => generate(Bash, &mut cmd, bin_name, &mut io::stdout()),
+            Shell::Zsh => generate(Zsh, &mut cmd, bin_name, &mut io::stdout()),
+        }
+
+        return Ok(());
+    }
 
     let ha_url = env::var("HA_URL").map_err(|_| "HA_URL env var is required")?;
     let ha_token = env::var("HA_TOKEN").map_err(|_| "HA_TOKEN env var is required")?;
@@ -37,37 +71,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Toggle => {
             let entity = client.get_state(entity_id).await?;
-            // println!("Device is : {}", entity.state);
             if entity.state == "off" {
                 client.set_state(entity_id, true).await?;
-                println!("Turned ON.")
-            }
-            else {
+                println!("Turned ON.");
+            } else {
                 client.set_state(entity_id, false).await?;
-                println!("Turned OFF.")
+                println!("Turned OFF.");
             }
         }
+        // already handled above, this arm is just to satisfy exhaustiveness
+        Commands::Completions { .. } => {}
     }
 
-
-    // // call the async method and handle the result
-    // match client.get_state(entity_id).await {
-    //     Ok(response) => {
-    //         println!("Entity id: {}, state: {}", response.entity_id, response.state);
-    //     }
-    //     Err(e) => {
-    //         eprintln!("Error getting state: {}", e);
-    //     }
-    // }
-
-    // let result = client.set_state(entity_id, false).await;
-    // match result {
-    //     Ok(res) => {
-    //         println!("Response: {}", res);
-    //     }
-    //     Err(e) => {
-    //         eprintln!("Error setting state: {}", e);
-    //     }
-    // }
     Ok(())
 }
+
